@@ -160,6 +160,8 @@ class UrlGenerator
                 },
                 explode(',', $model->nestedUnder)
             );
+
+            $modelAttr = $model->attributes();
             foreach ($nesting as $nest) {
                 list($klass, $entityIdSegment) = $nest;
                 if (!is_numeric($entityIdSegment)) {
