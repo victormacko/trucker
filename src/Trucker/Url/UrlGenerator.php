@@ -163,7 +163,12 @@ class UrlGenerator
             foreach ($nesting as $nest) {
                 list($klass, $entityIdSegment) = $nest;
                 if (!is_numeric($entityIdSegment)) {
-                    $entityIdSegment = ":$entityIdSegment";
+                    // @TODO - allow a custom 'isIdNumber' Closure function to be entered in config file.
+                    if(array_key_exists($entityIdSegment, $modelAttr)) {
+                        $entityIdSegment = $modelAttr[$entityIdSegment];
+                    } else {
+                        $entityIdSegment = ":$entityIdSegment";
+                    }
                 }
 
                 $entityTypeSegment = Inflector::pluralize(Inflector::tableize($klass));
