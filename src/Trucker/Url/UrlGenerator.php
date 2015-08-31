@@ -10,6 +10,7 @@
  */
 namespace Trucker\Url;
 
+use Trucker\Facades\Config;
 use Illuminate\Container\Container;
 use Doctrine\Common\Inflector\Inflector;
 
