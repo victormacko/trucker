@@ -525,6 +525,51 @@ class Model
         return Collection::fetch(new static, $condition, $resultOrder, $getParams);
     }
 
+    /**
+     * Handles creation of entities via the remote API.
+     *
+     * @return bool success of the create request
+     */
+    public function create() {
+        //get a request object
+        $request = RequestFactory::build();
+
+        //make a CREATE request
+        $request->createRequest(
+            Config::get('request.base_uri'),
+            UrlGenerator::getCreateUri($this),
+            'POST',
+            [], //no extra headers
+            Config::get('request.http_method_param')
+        );
+
+        return $this->processRequest($request, 'POST');
+    }
+
+    /**
+     * Function to update existing instances of the entity across the remote API.
+     * Will not handle create instances -- only sending updates.
+     *
+     * @return bool success of the update
+     */
+    public function update() {
+        //get a request object
+        $request = RequestFactory::build();
+
+        //make an UPDATE request
+        $request->createRequest(
+            Config::get('request.base_uri'),
+            UrlGenerator::getUpdateUri(
+                $this,
+                [':'.$this->getIdentityProperty() => $this->getId()]
+            ),
+            'PUT',
+            [], //no extra headers
+            Config::get('request.http_method_param')
+        );
+
+        return $this->processRequest($request, 'PUT');
+    }
 
     /**
      * Function to handle persistance of the entity across the
@@ -534,42 +579,30 @@ class Model
      */
     public function save()
     {
-        //get a request object
-        $request = RequestFactory::build();
-
         if ($this->getId() === false) {
-
-            //make a CREATE request
-            $request->createRequest(
-                Config::get('request.base_uri'),
-                UrlGenerator::getCreateUri($this),
-                'POST',
-                [], //no extra headers
-                Config::get('request.http_method_param')
-            );
-
+            return $this->create();
         } else {
-
-            //make an UPDATE request
-            $request->createRequest(
-                Config::get('request.base_uri'),
-                UrlGenerator::getDeleteUri(
-                    $this,
-                    [':'.$this->getIdentityProperty() => $this->getId()]
-                ),
-                'PUT',
-                [], //no extra headers
-                Config::get('request.http_method_param')
-            );
+            return $this->update();
         }
+    }
 
+    /**
+     * Process the request according to the $requestType specified.
+     *
+     * @param \Trucker\Requests\RestRequest $request
+     * @param string $requestType (GET/PUT/POST/DELETE)
+     * @return bool Success of the request
+     */
+    protected function processRequest($request, $requestType) {
         //add auth if it is needed
         if ($auth = AuthFactory::build()) {
             $request->authenticate($auth);
         }
 
-        //set the property attributes on the request
-        $request->setModelProperties($this);
+        if($requestType != 'DELETE') {
+            //set the property attributes on the request
+            $request->setModelProperties($this);
+        }
 
         //actually send the request
         $response = $request->sendRequest();
@@ -586,15 +619,17 @@ class Model
             return false;
         }//end if
 
-        //get the response and inflate from that
-        $data = $response->parseResponseToData();
-        $this->fill($data);
+        if($requestType != 'DELETE') {
+            //get the response and inflate from that
+            $data = $response->parseResponseToData();
+            $this->fill($data);
 
-        //inflate the ID property that should be guarded
-        //and thus not fillable
-        $id = $this->getIdentityProperty();
-        if (array_key_exists($id, $data)) {
-            $this->{$id} = $data[$id];
+            //inflate the ID property that should be guarded
+            //and thus not fillable
+            $id = $this->getIdentityProperty();
+            if (array_key_exists($id, $data)) {
+                $this->{$id} = $data[$id];
+            }
         }
 
         $this->doPostRequestCleanUp();
@@ -624,32 +659,7 @@ class Model
             Config::get('request.http_method_param')
         );
 
-        //add auth if it is needed
-        if ($auth = AuthFactory::build()) {
-            $request->authenticate($auth);
-        }
-
-        //actually send the request
-        $response = $request->sendRequest();
-
-        //clean up anything no longer needed
-        $this->doPostRequestCleanUp();
-
-        $interpreter = ResponseInterpreterFactory::build();
-
-        //handle clean response with errors
-        if ($interpreter->success($response)) {
-
-            return true;
-
-        } else if ($interpreter->invalid($response)) {
-
-            //get the errors and set them to our local collection
-            $this->errors = ErrorHandlerFactory::build()->parseErrors($response);
-
-        }//end if-else
-
-        return false;
+        return $this->processRequest($request, 'DELETE');
     }
 
 
