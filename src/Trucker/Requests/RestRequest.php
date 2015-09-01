@@ -304,9 +304,9 @@ class RestRequest implements RequestableInterface
         }
 
         if(Config::get('request.debug', false)) {
-            echo 'Type: ' . $this->request->getMethod() . "\n";
+            echo 'Request Method: ' . $this->request->getMethod() . "\n";
             echo "Body: " . $response->getBody() . "\n";
-            echo "Code: " . $response->getStatusCode() . "\n";
+            echo "Status Code: " . $response->getStatusCode() . "\n";
             echo "URL: " . $this->request->getUrl() . "\n\n";
         }
 
