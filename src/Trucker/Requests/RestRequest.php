@@ -303,6 +303,13 @@ class RestRequest implements RequestableInterface
             $response = $e->getResponse();
         }
 
+        if(Config::get('request.debug', false)) {
+            echo 'Type: ' . $this->request->getMethod() . "\n";
+            echo "Body: " . $response->getBody() . "\n";
+            echo "Code: " . $response->getStatusCode() . "\n";
+            echo "URL: " . $this->request->getUrl() . "\n\n";
+        }
+
         return $this->app->make('trucker.response')->newInstance($this->app, $response);
     }
 

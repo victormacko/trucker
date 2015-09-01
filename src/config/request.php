@@ -57,6 +57,22 @@
     |
     */
 
-    'http_method_param' => null,
+    'http_method_param' => null
 
+    /*
+    |--------------------------------------------------------------------------
+    | Debug
+    |--------------------------------------------------------------------------
+    |
+    | This enables (when set to true), or disables (when false) output to be echoed to the
+    | screen which is designed to assist in debugging of API requests.
+    | Included in output is the request type (GET/POST/etc), the body response, the status
+    | code, and url which was requested
+    |
+    | By default this is set to false.
+    |
+    */
+
+    'debug' => true,
+    
 );
