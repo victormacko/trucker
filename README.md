@@ -19,10 +19,18 @@ class Product extends Trucker\Resource\Model {} //create a class to use
 $p = new Product(['name' => 'My Test Product']);
 $success = $p->save(); //create a new entity
 
+$p = new Product(['name' => 'My Test Product']);
+$success = $p->create(); // create() can also be used to force an entity to send a 'create' request
+
 $found = Product::find(1); //find an existing entity
 
 $found->name = 'New Product Name';
 $success = $found->save(); //update an entity
+
+
+$found = Product::find(1); //find an existing entity
+$found->name = 'New Product Name';
+$success = $found->update(); // update() can also be used when forcing an entity to update data
 
 $success = $found->destroy(); //destroy an entity
 
