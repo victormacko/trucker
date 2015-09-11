@@ -199,7 +199,7 @@ class RestRequest implements RequestableInterface
                 $this->request->addPostFile($key, $value);
             } else {
                 if (!in_array($key, $cantSet)) {
-                    $body[$key] = $value;
+                    $body[$key] = ($value !== null ? $value : '');
                 }
             }
         }
