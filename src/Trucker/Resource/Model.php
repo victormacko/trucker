@@ -76,7 +76,7 @@ class Model
      *
      *
      * This value can be nested as a comma separated string as well.
-     * So you could set something like 
+     * So you could set something like
      * "Company:company_id,Employee:employee_id,Preference:pref_id"
      * which would generate
      * /companies/:company_id/employees/:employee_id/preferences/:pref_id
@@ -149,9 +149,9 @@ class Model
 
     /**
      * Portion of a property name that would indicate
-     * that the value would be Base64 encoded when the 
+     * that the value would be Base64 encoded when the
      * property is set.
-     * 
+     *
      * @var string
      */
     protected $base64Indicator;
@@ -185,10 +185,10 @@ class Model
         $model = new static;
 
         $model->fill((array) $attributes);
-    
+
         return $model;
     }
-    
+
 
 
     /**
@@ -235,7 +235,7 @@ class Model
 
     /**
      * Magic unsetter function for unsetting an instance property
-     * 
+     *
      * @param string $property Property name
      * @return void
      */
@@ -251,7 +251,7 @@ class Model
      * Getter function to access the
      * underlying attributes array for the
      * entity
-     * 
+     *
      * @return arrayhttpStatusError
      */
     public function attributes()
@@ -395,7 +395,7 @@ class Model
 
     /**
      * Getter function to return the identity property
-     * 
+     *
      * @return string
      */
     public function getIdentityProperty()
@@ -406,7 +406,7 @@ class Model
 
     /**
      * Getter function to return the scratch disk location
-     * 
+     *
      * @return string
      */
     public function getScratchDiskLocation()
@@ -417,7 +417,7 @@ class Model
 
     /**
      * Getter function to return base64 param indicator
-     * 
+     *
      * @return string
      */
     public function getBase64Indicator()
@@ -429,7 +429,7 @@ class Model
     /**
      * Function to return an array of property names
      * that are read only
-     * 
+     *
      * @return array
      */
     public function getReadOnlyFields()
@@ -442,7 +442,7 @@ class Model
     /**
      * Function to get an associative array of fields
      * with their values that are NOT read only
-     * 
+     *
      * @return array
      */
     public function getMutableFields()
@@ -485,7 +485,7 @@ class Model
     /**
      * Getter function to return a URI
      * that has been manually set
-     * 
+     *
      * @return string
      */
     public function getURI()
@@ -511,7 +511,7 @@ class Model
 
     /**
      * Function to find a collection of Entity records from the remote api
-     * 
+     *
      * @param  QueryConditionInterface    $condition   query conditions
      * @param  QueryResultOrderInterface  $resultOrder result ordering info
      * @param  array                      $getParams   additional GET params
@@ -526,22 +526,52 @@ class Model
     }
 
     /**
+     * Create a request to use with the specified request type & any additional text after the url
+     * @param $requestType (GET/POST/DELETE/PATCH/PUT)
+     * @param string $urlSuffix (anything else to add after the url)
+     */
+    protected function createRequest($requestType, $urlSuffix = '') {
+        //get a request object
+        $request = RequestFactory::build();
+
+        // find the method to use for url generation based on the request type
+        $methodToFnMap = ['POST' => 'getCreateUri', 'GET' => 'getInstanceUri', 'DELETE' => 'getDeleteUri', 'PUT' => 'getUpdateUri'];
+        if(!isset($methodToFnMap[strtoupper($requestType)])) {
+            throw new Exception('Request type "' . $requestType . '" not supported');
+        }
+        $fnName = $methodToFnMap[strtoupper($requestType)];
+
+        // put together the url options to pass in
+        $urlOptions = [];
+        if($this->getId()) {
+            $urlOptions[':'.$this->getIdentityProperty()] = $this->getId();
+        }
+
+        // get the url to use
+        $url = call_user_func([UrlGenerator::class, $fnName],
+                $this,
+                $urlOptions
+            ) . $urlSuffix;
+
+        //init the request
+        $request->createRequest(
+            Config::get('request.base_uri'),
+            $url,
+            $requestType,
+            [], //no extra headers
+            Config::get('request.http_method_param')
+        );
+
+        return $request;
+    }
+
+    /**
      * Handles creation of entities via the remote API.
      *
      * @return bool success of the create request
      */
     public function create() {
-        //get a request object
-        $request = RequestFactory::build();
-
-        //make a CREATE request
-        $request->createRequest(
-            Config::get('request.base_uri'),
-            UrlGenerator::getCreateUri($this),
-            'POST',
-            [], //no extra headers
-            Config::get('request.http_method_param')
-        );
+        $request = $this->createRequest('POST');
 
         return $this->processRequest($request, 'POST');
     }
@@ -553,20 +583,7 @@ class Model
      * @return bool success of the update
      */
     public function update() {
-        //get a request object
-        $request = RequestFactory::build();
-
-        //make an UPDATE request
-        $request->createRequest(
-            Config::get('request.base_uri'),
-            UrlGenerator::getUpdateUri(
-                $this,
-                [':'.$this->getIdentityProperty() => $this->getId()]
-            ),
-            'PUT',
-            [], //no extra headers
-            Config::get('request.http_method_param')
-        );
+        $request = $this->createRequest('PUT');
 
         return $this->processRequest($request, 'PUT');
     }
@@ -594,30 +611,16 @@ class Model
      * @return bool Success of the request
      */
     protected function processRequest($request, $requestType) {
-        //add auth if it is needed
-        if ($auth = AuthFactory::build()) {
-            $request->authenticate($auth);
-        }
-
         if($requestType != 'DELETE') {
             //set the property attributes on the request
             $request->setModelProperties($this);
         }
 
-        //actually send the request
-        $response = $request->sendRequest();
-
-        //handle clean response with errors
-        if (ResponseInterpreterFactory::build()->invalid($response)) {
-
-            //get the errors and set them to our local collection
-            $this->errors = ErrorHandlerFactory::build()->parseErrors($response);
-
-            //do any needed cleanup
-            $this->doPostRequestCleanUp();
-
+        $response = $this->sendRequest($request, $requestType);
+        // if the response is invalid / doesn't work
+        if($response === false) {
             return false;
-        }//end if
+        }
 
         if($requestType != 'DELETE') {
             //get the response and inflate from that
@@ -636,6 +639,38 @@ class Model
         return true;
     }
 
+    /**
+     * Actually send the request specified. This has been separated out to allow subclasses to add in their own
+     * methods as needed.
+     *
+     * @param \Trucker\Requests\RestRequest $request
+     * @param string $requestType (GET/DELETE/PUT/PATCH/POST/etc)
+     * @return bool|\Trucker\Responses\Response
+     */
+    protected function sendRequest($request) {
+        //add auth if it is needed
+        if ($auth = AuthFactory::build()) {
+            $request->authenticate($auth);
+        }
+
+        //actually send the request
+        $response = $request->sendRequest();
+
+        //handle clean response with errors
+        if (ResponseInterpreterFactory::build()->invalid($response)) {
+
+            //get the errors and set them to our local collection
+            $this->errors = ErrorHandlerFactory::build()->parseErrors($response);
+
+            //do any needed cleanup
+            $this->doPostRequestCleanUp();
+
+            return false;
+        }//end if
+
+        return $response;
+    }
+
 
     /**
      * Function to delete an existing entity
@@ -644,20 +679,7 @@ class Model
      */
     public function destroy()
     {
-        //get a request object
-        $request = RequestFactory::build();
-
-        //init the request
-        $request->createRequest(
-            Config::get('request.base_uri'),
-            UrlGenerator::getDeleteUri(
-                $this,
-                [':'.$this->getIdentityProperty() => $this->getId()]
-            ),
-            'DELETE',
-            [], //no extra headers
-            Config::get('request.http_method_param')
-        );
+        $request = $this->createRequest('DELETE');
 
         return $this->processRequest($request, 'DELETE');
     }
