@@ -11,10 +11,13 @@
 namespace Trucker\Finders;
 
 use Illuminate\Container\Container;
+use Trucker\Facades\ErrorHandlerFactory;
 use Trucker\Facades\RequestFactory;
+use Trucker\Facades\ResponseInterpreterFactory;
 use Trucker\Facades\UrlGenerator;
 use Trucker\Facades\Config;
 use Trucker\Facades\AuthFactory;
+use Trucker\RequestException;
 use Trucker\Responses\Collection;
 use Trucker\Finders\Conditions\QueryConditionInterface;
 use Trucker\Finders\Conditions\QueryResultOrderInterface;
@@ -50,7 +53,7 @@ class CollectionFinder
     /**
      * Function to fetch a collection of Trucker\Resource\Model object
      * from the remote API.
-     * 
+     *
      * @param  Model                      $model       Instance of entity type being fetched
      * @param  QueryConditionInterface    $condition   Query conditions for the request
      * @param  QueryResultOrderInterface  $resultOrder Result ordering requirements for the request
@@ -66,7 +69,7 @@ class CollectionFinder
 
         //get a request object
         $request = RequestFactory::build();
-        
+
         //init the request
         $request->createRequest(
             Config::get('request.base_uri'),
@@ -94,6 +97,15 @@ class CollectionFinder
 
         //actually send the request
         $response = $request->sendRequest();
+
+        //handle clean response with errors
+        if (ResponseInterpreterFactory::build()->invalid($response)) {
+
+            //get the errors and set them to our local collection
+            $errors = ErrorHandlerFactory::build()->parseErrors($response);
+
+            throw new RequestException('Error received when requesting collection', $errors);
+        }//end if
 
         //get api response
         $data = $response->parseResponseToData();
