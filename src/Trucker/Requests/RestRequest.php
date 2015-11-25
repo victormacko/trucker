@@ -204,11 +204,8 @@ class RestRequest implements RequestableInterface
             }
         }
 
-        if($this->request->getMethod() == 'POST') {
-            $this->request->addPostFields($body);
-        } else {
-            $this->request->setBody($body);
-        }
+        $transporter = TransporterFactory::build();
+        $transporter->setRequestBody($this, $body);
     }
 
     /**
