@@ -35,6 +35,9 @@ class RequestFactory extends FactoryDriver
     {
         $this->app = $app;
         $this->client = new \Guzzle\Http\Client();
+
+        $cookiePlugin = new CookiePlugin(new ArrayCookieJar());
+        $this->client->addSubscriber($cookiePlugin);
     }
 
 
